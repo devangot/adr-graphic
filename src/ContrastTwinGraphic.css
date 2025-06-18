@@ -1,0 +1,202 @@
+.ctg-container {
+  max-width: none;
+  width: 100vw;
+  min-width: 100vw;
+  margin: 0;
+  padding: 0 0 2rem 0;
+  background: #101214;
+  border-radius: 0;
+  box-shadow: none;
+  color: #fff;
+  font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+  border: none;
+  overflow-x: auto;
+}
+.ctg-main-graphic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.ctg-twin {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: #101214;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 32px #00e6c388;
+  margin-right: 2rem;
+  transition: box-shadow 0.3s, border 0.3s;
+  border: 4px solid #00e6c3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: visible;
+}
+.ctg-twin:after {
+  content: url('https://www.contrastsecurity.com/hubfs/contrast-web-platform--2025/images/logos/contrast-logo--min-green-and-black.svg');
+  display: block;
+  width: 60px;
+  height: 60px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.ctg-entities {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.ctg-entity {
+  position: absolute;
+  color: #00e6c3;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: rgba(16,18,20,0.85);
+  border-radius: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+  border: 1px solid #2e7be6;
+  box-shadow: 0 2px 8px #0002;
+  transform: translate(-50%, -50%);
+}
+.ctg-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.ctg-feature-btn {
+  background: #23293a;
+  color: #fff;
+  border: 1.5px solid #00e6c3;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.ctg-feature-btn.active, .ctg-feature-btn:hover {
+  background: #00e6c3;
+  color: #101214;
+  border-color: #2e7be6;
+}
+.ctg-details {
+  margin-top: 1.5rem;
+  background: #181c24;
+  border-radius: 1rem;
+  padding: 1.25rem 1rem 1rem 1rem;
+  border: 1.5px solid #2e7be6;
+}
+.ctg-details h3 {
+  margin: 0 0 0.5rem 0;
+  color: #00e6c3;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.ctg-scenario {
+  margin-top: 0.75rem;
+  background: #101214;
+  border-left: 4px solid #00e6c3;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.98rem;
+  color: #fff;
+}
+.ctg-container h2 {
+  font-family: 'Inter', 'Segoe UI', 'Arial', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #00e6c3;
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.01em;
+}
+.ctg-entity-list {
+  margin-top: 1.25rem;
+  background: #181c24;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #23293a;
+  color: #00e6c3;
+  font-size: 0.98rem;
+}
+.ctg-entity-list ul {
+  columns: 2;
+  margin: 0.5rem 0 0 0;
+  padding: 0;
+  list-style: disc inside;
+}
+.ctg-entity-list li {
+  margin-bottom: 0.25rem;
+  color: #fff;
+  font-size: 0.97rem;
+}
+.ctg-large-graphic {
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+.ctg-svg-graph {
+  background: #181c24;
+  border-radius: 2rem;
+  box-shadow: 0 4px 32px #0003;
+  border: 2px solid #00e6c3;
+  width: 1000px;
+  height: 600px;
+  max-width: 100vw;
+  min-width: 1000px;
+  display: block;
+}
+.ctg-sec-legend {
+  margin: 1.5rem auto 2.5rem auto;
+  max-width: 600px;
+  background: #101214;
+  border-radius: 1rem;
+  border: 1.5px solid #2e7be6;
+  color: #fff;
+  font-size: 1.1rem;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 2px 12px #0002;
+}
+.ctg-sec-legend ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem 2.2rem;
+  margin: 0.5rem 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ctg-sec-badge {
+  display: inline-block;
+  width: 2.1em;
+  height: 2.1em;
+  line-height: 2.1em;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.1em;
+  text-align: center;
+  margin-right: 0.5em;
+  box-shadow: 0 2px 8px #0002;
+}
+.ctg-image-graphic {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  margin-bottom: 2.5rem;
+}
+.ctg-svg-flow {
+  background: #101214;
+  border-radius: 2rem;
+  box-shadow: 0 4px 32px #0003;
+  border: 2px solid #00e6c3;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+}
