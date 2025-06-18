@@ -32,7 +32,11 @@ const scenarioSteps = [
     'The Contrast sensor detects the attack.'
   ],
   [
-    'An alert is generated and sent to the SOC and a security analyst begins investigation, confirms the attack, and blocks it.'
+    'An alert is generated and sent to the SOC and a security analyst begins investigation'
+  ],
+  // New step 5: SOC analyst blocks the attack
+  [
+    'The SOC analyst confirms the attack and blocks it'
   ],
   [
     'Now that the attack is blocked and the web application is safe, an issue is created for the developer to make a code fix.',
@@ -45,6 +49,7 @@ const featureStrings = [
   'Runtime attack detection and response. Visibility right into the application layer, uncovering zero-day attacks.',
   'See attacks on applications. Get real-time alerts that include crucial context and fewer false positives with enhanced attack intelligence and integrations with SIEM, CNAPP and XDR platforms.',
   'Guided security runbooks. Clear, actionable steps to quickly identify true positive attacks and contain threats.',
+  'Guided security runbooks. Clear, actionable steps to quickly identify true positive attacks and contain threats.', // Step 5 now matches step 4
   'Guided developer runbooks. Clear, actionable steps to quickly fix vulnerable code and libraries.'
 ];
 
@@ -59,8 +64,9 @@ type AnimatedLineProps = {
   strokeWidth: number;
   dashArray?: string;
   markerEnd?: string;
+  opacity?: number;
 };
-function AnimatedLine({ x1, y1, x2, y2, progress, stroke, strokeWidth, dashArray = '', markerEnd = '' }: AnimatedLineProps) {
+function AnimatedLine({ x1, y1, x2, y2, progress, stroke, strokeWidth, dashArray = '', markerEnd = '', opacity = 1 }: AnimatedLineProps) {
   // Linear interpolation for growing line
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -76,6 +82,7 @@ function AnimatedLine({ x1, y1, x2, y2, progress, stroke, strokeWidth, dashArray
       strokeWidth={strokeWidth}
       strokeDasharray={dashArray}
       markerEnd={markerEnd || undefined}
+      opacity={opacity}
     />
   );
 }
@@ -93,11 +100,21 @@ export default function ContrastTwinGraphic() {
   const [compromisedNodes, setCompromisedNodes] = useState<string[]>([]);
   // Step 4 animation states
   const [socLineProgress, setSocLineProgress] = useState(0);
+  // Animation state for SOC analyst pop-in
+  const [socPopIn, setSocPopIn] = useState(false);
+  // Animation state for webapp glow
+  const [webappGlow, setWebappGlow] = useState(false);
+  // Animation state for blue line
+  const [showBlueLine, setShowBlueLine] = useState(false);
+  const [blueLineProgress, setBlueLineProgress] = useState(0);
+  const [blueLineOpacity, setBlueLineOpacity] = useState(1);
+  // Animation state for red line fade in step 5 and 6
+  const [redLineOpacity, setRedLineOpacity] = useState(1);
+  // Animation state for red node highlight fade in step 5 and 6
+  const [redNodeOpacity, setRedNodeOpacity] = useState(1);
+  // Animation state for attacker/node fade in step 6
+  const [attackerOpacity, setAttackerOpacity] = useState(1);
 
-  // Use the same SOC analyst position for both steps
-  const socAnalystX = 600, socAnalystY = 30;
-cat ~/.ssh/id_ed25519.pub
-  // Animate step string: fade between sentences
   useEffect(() => {
     setStepTextIndex(0);
     setShowCVE(false);
@@ -106,16 +123,14 @@ cat ~/.ssh/id_ed25519.pub
     setAttackSegment(0);
     setAttackProgress(0);
     setSocLineProgress(0);
-    // Carry compromised state from end of step 3 to start of step 4
-    if (step === 3) {
+    // Compromised nodes logic
+    if (step === 3 || step === 4 || step === 5) {
       setCompromisedNodes(['webapp', 'waf', 'server', 'cloud', 'db']);
     } else {
       setCompromisedNodes([]);
     }
-    // Reset all animation states on step change
-    // Reset all animation states on step change
+    // Step 1: CVE fade-in and line animation
     if (step === 1) {
-      // Step 2 animation sequence: fade in CVE with first sentence, then animate lines with second sentence
       let raf1: number, raf2: number;
       setShowCVE(false);
       setCveLineProgress(0);
@@ -162,6 +177,7 @@ cat ~/.ssh/id_ed25519.pub
         cancelAnimationFrame(raf2);
       };
     }
+    // Step 2: Attack line animation
     if (step === 2) {
       // Step 3: Animate solid line, pausing at each node, then mark all as compromised
       let raf: number;
@@ -201,57 +217,144 @@ cat ~/.ssh/id_ed25519.pub
       }
       return () => cancelAnimationFrame(raf);
     }
-    if (step === 3) {
-      // Step 4: Animate sensor light and analyst fade in, then blue line
-      let raf: number;
-      let timer: number | undefined;
-      // Always show first sentence, then fade to second after a delay
-      if (stepTextIndex === 0 && scenarioSteps[step].length > 1) {
-        timer = window.setTimeout(() => {
-          setStepTextIndex(1);
-        }, 2200); // Adjust delay as needed
-      }
-      if (stepTextIndex === 1) {
-        // Animate blue line from webapp to SOC
-        const animateLine = () => {
-          setSocLineProgress(p => {
+    // Step 4: SOC pop-in, webapp glow, blue line
+    if (step === 4) {
+      setSocPopIn(false);
+      setWebappGlow(false);
+      setShowBlueLine(false);
+      setBlueLineProgress(0);
+      setBlueLineOpacity(1);
+      setTimeout(() => {
+        setSocPopIn(true);
+        setWebappGlow(true);
+        setTimeout(() => {
+          setShowBlueLine(true);
+          // Animate the blue line progress
+          let raf: number;
+          const animate = () => {
+            setBlueLineProgress(p => {
+              if (p < 1) {
+                raf = requestAnimationFrame(animate);
+                return Math.min(1, p + 0.04);
+              }
+              // After line is fully drawn, start fade out after a 2 second pause
+              setTimeout(() => {
+                const fade = () => {
+                  setBlueLineOpacity(op => {
+                    if (op > 0) {
+                      requestAnimationFrame(fade);
+                      return Math.max(0, op - 0.04);
+                    }
+                    return 0;
+                  });
+                };
+                fade();
+              }, 2000); // 2 second pause before fading out
+              return 1;
+            });
+          };
+          animate();
+        }, 800); // Wait for pop-in/glow to finish
+      }, 300);
+    }
+    // Step 5: SOC blocks attack, blue line reverse, fade out red lines/highlights
+    if (step === 5) {
+      setSocPopIn(true);
+      setWebappGlow(true);
+      setShowBlueLine(false);
+      setBlueLineProgress(0);
+      setBlueLineOpacity(1);
+      setRedLineOpacity(1);
+      setRedNodeOpacity(1);
+      setAttackerOpacity(1);
+      setTimeout(() => {
+        setShowBlueLine(true);
+        // Animate the blue line progress (reverse direction, slower)
+        let raf: number;
+        const animate = () => {
+          setBlueLineProgress(p => {
             if (p < 1) {
-              raf = requestAnimationFrame(animateLine);
-              return Math.min(1, p + 0.04);
+              raf = requestAnimationFrame(animate);
+              return Math.min(1, p + 0.018);
             }
+            // After line is fully drawn, start fade out after a 2 second pause
+            setTimeout(() => {
+              const fadeBlue = () => {
+                setBlueLineOpacity(op => {
+                  if (op > 0) {
+                    requestAnimationFrame(fadeBlue);
+                    return Math.max(0, op - 0.04);
+                  }
+                  // After blue line fades, fade red lines and node highlights
+                  setTimeout(() => {
+                    const fadeRed = () => {
+                      setRedLineOpacity(r => {
+                        if (r > 0) {
+                          requestAnimationFrame(fadeRed);
+                          return Math.max(0, r - 0.04);
+                        }
+                        return 0;
+                      });
+                      setRedNodeOpacity(n => {
+                        if (n > 0) {
+                          requestAnimationFrame(fadeRed);
+                          return Math.max(0, n - 0.04);
+                        }
+                        return 0;
+                      });
+                    };
+                    fadeRed();
+                  }, 200); // Short pause after blue line fade
+                  return 0;
+                });
+              };
+              fadeBlue();
+            }, 2000);
             return 1;
           });
         };
-        animateLine();
-      }
-      return () => { cancelAnimationFrame(raf); if (timer) clearTimeout(timer); };
+        animate();
+      }, 800);
     }
-    if (step === 4) {
-      // Step 4: lit sensor, SOC analyst appears (no line)
-      // No animation needed, just show both
-    }
-    if (step === 5) {
-      // Step 5: animate blue line from webapp to SOC
-      let raf: number;
-      const animateLine = () => {
-        setSocLineProgress(p => {
-          if (p < 1) {
-            raf = requestAnimationFrame(animateLine);
-            return Math.min(1, p + 0.04);
-          }
-          return 1;
-        });
-      };
-      animateLine();
-      return () => cancelAnimationFrame(raf);
-    }
-    if (step === 5) {
-      // Remove legacy/unused code for SOC/dev/fix
-      // setShowSOC(true);
-      // setShowDev(true);
-      // setSocAlertProgress(1);
-      // setDevFixProgress(1);
-      setTimeout(() => setStepTextIndex(1), 2200);
+    // Step 6: developer fix
+    if (step === 6) {
+      setCompromisedNodes(['webapp', 'waf', 'server', 'cloud', 'db']);
+      setRedLineOpacity(1);
+      setRedNodeOpacity(1);
+      setAttackerOpacity(1);
+      // Fade out red lines and node highlights after a delay
+      setTimeout(() => {
+        const fadeRed = () => {
+          setRedLineOpacity(r => {
+            if (r > 0) {
+              requestAnimationFrame(fadeRed);
+              return Math.max(0, r - 0.04);
+            }
+            return 0;
+          });
+          setRedNodeOpacity(n => {
+            if (n > 0) {
+              requestAnimationFrame(fadeRed);
+              return Math.max(0, n - 0.04);
+            }
+            return 0;
+          });
+        };
+        fadeRed();
+        // After lines and highlights fade, fade attacker and its lines
+        setTimeout(() => {
+          const fadeAttacker = () => {
+            setAttackerOpacity(a => {
+              if (a > 0) {
+                requestAnimationFrame(fadeAttacker);
+                return Math.max(0, a - 0.04);
+              }
+              return 0;
+            });
+          };
+          fadeAttacker();
+        }, 1200); // Start attacker fade after lines/highlights fade
+      }, 2000); // 2 second pause before fading
     }
   }, [step]);
 
@@ -280,24 +383,32 @@ cat ~/.ssh/id_ed25519.pub
             <line x1={720} y1={120} x2={860} y2={120} stroke="#888" strokeWidth={3} strokeDasharray="8 6" opacity={0.6} />
             {/* Third party below webapp connection */}
             <line x1={300} y1={120} x2={300} y2={220} stroke="#888" strokeWidth={3} strokeDasharray="8 8" opacity={0.6} />
-            {infraNodes.map(node => (
-              <g key={node.key}>
-                <circle cx={node.x} cy={node.y} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
-                <text x={node.x} y={node.y + 10} textAnchor="middle" fontSize={28} fill="#fff">{node.icon}</text>
-                <text x={node.x} y={node.y + 48} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>{node.label}</text>
-                {/* Overlay the Contrast sensor image on the web application */}
-                {node.key === 'webapp' && (
-                  <image
-                    href={contrastSensorImg}
-                    x={node.x - 18}
-                    y={node.y - 50}
-                    width={36}
-                    height={36}
-                    style={{ pointerEvents: 'none' }}
-                  />
-                )}
-              </g>
-            ))}
+            {/* Main node rendering loop */}
+            {infraNodes.map(node => {
+              const isDb = node.key === 'db';
+              return (
+                <g key={node.key}>
+                  {/* Only render db highlight in step 3, 4, or 5 while fading */}
+                  {(isDb && ((step === 3 || step === 4) || (step === 5 && redNodeOpacity > 0.01))) && (
+                    <circle cx={node.x} cy={node.y} r={38} fill="#e74c3c" opacity={0.18 * (step === 5 ? redNodeOpacity : 1)} />
+                  )}
+                  <circle cx={node.x} cy={node.y} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
+                  <text x={node.x} y={node.y + 10} textAnchor="middle" fontSize={28} fill="#fff">{node.icon}</text>
+                  <text x={node.x} y={node.y + 48} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>{node.label}</text>
+                  {/* Overlay the Contrast sensor image on the web application */}
+                  {node.key === 'webapp' && (
+                    <image
+                      href={contrastSensorImg}
+                      x={node.x - 18}
+                      y={node.y - 50}
+                      width={36}
+                      height={36}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                </g>
+              );
+            })}
             {/* Step 2: fade in CVE, animate lines */}
             {step === 1 && (
               <g>
@@ -324,7 +435,7 @@ cat ~/.ssh/id_ed25519.pub
               </g>
             )}
             {/* Step 2 and beyond: CVE node and attack lines persist */}
-            {(step >= 1) && (
+            {(step >= 1 && step !== 6) && (
               <g>
                 {/* CVE node fade in (always visible after step 2) */}
                 <g style={{ opacity: (step === 1 ? (showCVE ? 1 : 0) : 1), transition: 'opacity 0.6s' }}>
@@ -336,17 +447,19 @@ cat ~/.ssh/id_ed25519.pub
                 {/* Dashed red line (growing in step 2, static after) from attacker to CVE */}
                 {(step === 1
                   ? (showCVE && cveLineProgress > 0 && <AnimatedLine x1={60} y1={120} x2={200} y2={60} progress={cveLineProgress} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />)
-                  : <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />
+                  : (step > 1 && step !== 6 && <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
                 )}
                 {/* Dashed red line (growing in step 2, static after) from attacker to webapp without arrow */}
-                {((step === 1 && cveLineProgress === 1 && webappLineProgress > 0)
-                  ? <AnimatedLine x1={60} y1={120} x2={300} y2={120} progress={webappLineProgress} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />
-                  : (step > 1 && <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
+                {step === 1 && cveLineProgress === 1 && webappLineProgress > 0 && (
+                  <AnimatedLine x1={60} y1={120} x2={300} y2={120} progress={webappLineProgress} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />
+                )}
+                {(step > 1 && step < 7) && (
+                  <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step === 6 ? redLineOpacity * attackerOpacity : 1} />
                 )}
                 {/* Dashed red line (growing in step 2, static after) from webapp to third party */}
                 {(step === 1
                   ? (webappLineProgress === 1 && <AnimatedLine x1={300} y1={120} x2={300} y2={220} progress={1} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />)
-                  : (step > 1 && <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
+                  : (step > 1 && step !== 6 && <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
                 )}
                 <defs>
                   <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
@@ -382,16 +495,20 @@ cat ~/.ssh/id_ed25519.pub
                   return lines;
                 })()}
                 {/* Compromised state: highlight all nodes after line reaches db */}
-                {['webapp','waf','server','cloud','db'].map(key => compromisedNodes.includes(key) && (
+                {['webapp','waf','server','cloud'].map(key => compromisedNodes.includes(key) && (
                   <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
                 ))}
+                {/* Database highlight: only in step 2 if compromised */}
+                {compromisedNodes.includes('db') && (
+                  <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                )}
               </g>
             )}
             {/* Step 4: SOC node, alert line, dev node, fix line */}
             {/* (removed: all references to showSOC, socAlertProgress, showDev, devFixProgress, and their lines/nodes) */}
             {/* Step 4: show db node as safe (green highlight) */}
             {step === 4 && (
-              <circle cx={860} cy={120} r={38} fill="#00e6c3" opacity={0.18} />
+              <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
             )}
             {/* Step 3 & 4: attack line through infra, compromised state */}
             {(step === 2 || step === 3) && (
@@ -404,12 +521,18 @@ cat ~/.ssh/id_ed25519.pub
                     { from: [440, 120], to: [580, 120] },
                     { from: [580, 120], to: [720, 120] },
                     { from: [720, 120], to: [860, 120] },
+                    // New: webapp to third party
+                    { from: [300, 120], to: [300, 220] },
                   ];
                   // In step 3, animate as before. In step 4, always show all segments.
                   if (step === 3 || (step === 2 && compromisedNodes.length === 5)) {
-                    return segs.map((seg, i) => (
-                      <line key={i} x1={seg.from[0]} y1={seg.from[1]} x2={seg.to[0]} y2={seg.to[1]} stroke="#e74c3c" strokeWidth={4} />
-                    ));
+                    return [
+                      ...segs.map((seg, i) => (
+                        <line key={i} x1={seg.from[0]} y1={seg.from[1]} x2={seg.to[0]} y2={seg.to[1]} stroke="#e74c3c" strokeWidth={4} />
+                      )),
+                      // Always show webapp→third party in step 3/4
+                      <line key="webapp-3p" x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} />
+                    ];
                   }
                   // Incomplete step 3: show animated segments
                   let lines = [];
@@ -417,19 +540,91 @@ cat ~/.ssh/id_ed25519.pub
                     lines.push(
                       <line key={i} x1={segs[i].from[0]} y1={segs[i].from[1]} x2={segs[i].to[0]} y2={segs[i].to[1]} stroke="#e74c3c" strokeWidth={4} />
                     );
+                    // If drawing webapp→waf, also draw webapp→third party
+                    if (i === 1) {
+                      lines.push(
+                        <line key="webapp-3p-static" x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} />
+                      );
+                    }
                   }
                   if (attackSegment > 0 && attackSegment <= segs.length) {
                     const seg = segs[attackSegment - 1];
                     lines.push(
                       <AnimatedLine key={"anim-"+attackSegment} x1={seg.from[0]} y1={seg.from[1]} x2={seg.to[0]} y2={seg.to[1]} progress={attackProgress} stroke="#e74c3c" strokeWidth={4} />
                     );
+                    // If animating webapp→waf, also animate webapp→third party
+                    if (attackSegment === 2) {
+                      lines.push(
+                        <AnimatedLine key="anim-webapp-3p" x1={300} y1={120} x2={300} y2={220} progress={attackProgress} stroke="#e74c3c" strokeWidth={4} />
+                      );
+                    }
                   }
                   return lines;
                 })()}
                 {/* Compromised state: highlight all nodes after line reaches db or in step 4 */}
-                {['webapp','waf','server','cloud','db'].map(key => ((compromisedNodes.includes(key) || step === 3) && (
-                  <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
-                )))}
+                {['webapp','waf','server','cloud','thirdparty','db'].map(key => {
+                  // For step 2 (step===2), highlight thirdparty only if attackSegment > 2 (after webapp->thirdparty animates)
+                  if (key === 'thirdparty' && step === 2) {
+                    if (attackSegment > 2 || compromisedNodes.includes('thirdparty')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For webapp, highlight only after attackSegment > 0 (attack reached webapp)
+                  if (key === 'webapp' && step === 2) {
+                    if (attackSegment > 0 || compromisedNodes.includes('webapp')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For waf, highlight after attackSegment > 1
+                  if (key === 'waf' && step === 2) {
+                    if (attackSegment > 1 || compromisedNodes.includes('waf')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For server, highlight after attackSegment > 2
+                  if (key === 'server' && step === 2) {
+                    if (attackSegment > 2 || compromisedNodes.includes('server')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For cloud, highlight after attackSegment > 3
+                  if (key === 'cloud' && step === 2) {
+                    if (attackSegment > 3 || compromisedNodes.includes('cloud')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For db, highlight after attackSegment > 4
+                  if (key === 'db' && step === 2) {
+                    if (attackSegment > 4 || compromisedNodes.includes('db')) {
+                      return (
+                        <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                      );
+                    }
+                    return null;
+                  }
+                  // For all other nodes, highlight as before
+                  if ((compromisedNodes.includes(key) || step === 3)) {
+                    return (
+                      <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                    );
+                  }
+                  return null;
+                })}
               </g>
             )}
             {/* Step 4: sensor lights up, analyst appears, blue line animates */}
@@ -437,64 +632,111 @@ cat ~/.ssh/id_ed25519.pub
               <g>
                 {/* Webapp pulse or light up (always visible in step 4) */}
                 <circle cx={300} cy={120} r={38} fill="#00e6c3" opacity={0.25} className="ctg-pulse" />
-                {/* SOC/Security Analyst user object (always visible in step 4) */}
-                <g>
-                  <circle cx={600} cy={60} r={32} fill="#23293a" stroke="#00e6c3" strokeWidth={2} />
-                  <text x={600} y={70} textAnchor="middle" fontSize={28} fill="#fff">🧑‍💼</text>
-                  <text x={600} y={108} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>SOC Analyst</text>
-                </g>
-                {/* Blue line from webapp to SOC/analyst (animated on second sentence) */}
-                {stepTextIndex === 1 && socLineProgress > 0 && (
-                  <AnimatedLine x1={300} y1={120} x2={600} y2={60} progress={socLineProgress} stroke="#00e6c3" strokeWidth={4} />
-                )}
+                {/* SOC/Security Analyst user object removed */}
               </g>
             )}
-            {/* Step 4: webapp lit, SOC/analyst visible, no line */}
-            {step === 4 && (
+            {/* Step 4: webapp lit, SOC/analyst appears with pop-in and glow, then blue line */}
+            {(step === 4 || step === 5) && (
               <g>
-                {/* Brighter webapp sensor highlight */}
+                {/* Brighter webapp sensor highlight (match step 5 style) */}
                 <circle cx={300} cy={120} r={44} fill="#00fff0" opacity={0.45} style={{ filter: 'blur(2.5px)' }} />
-                {/* SOC/Security Analyst user object (move higher in step 4) */}
-                <g>
-                  <circle cx={socAnalystX} cy={0} r={32} fill="#23293a" stroke="#00e6c3" strokeWidth={2} />
-                  <text x={socAnalystX} y={10} textAnchor="middle" fontSize={28} fill="#fff">🧑‍💼</text>
-                  <text x={socAnalystX} y={48} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>SOC Analyst</text>
+                {/* Webapp node (match step 5 style) with glow animation */}
+                <g style={{
+                  filter: webappGlow ? 'drop-shadow(0 0 16px #00e6c3)' : 'none',
+                  transition: 'filter 0.7s',
+                }}>
+                  <circle cx={300} cy={120} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
+                  <text x={300} y={130} textAnchor="middle" fontSize={28} fill="#fff">🖥️</text>
+                  <text x={300} y={168} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>Web Application</text>
+                  {/* Overlay the Contrast sensor image on the web application (match step 5 style) */}
+                  <image
+                    href={contrastSensorImg}
+                    x={300 - 18}
+                    y={120 - 50}
+                    width={36}
+                    height={36}
+                    style={{ pointerEvents: 'none' }}
+                  />
                 </g>
+                {/* SOC Analyst node, aligned vertically with attacker, in a row below, fade in only in step 4; always visible in step 5 */}
+                <g style={{
+                  opacity: step === 4 ? (socPopIn ? 1 : 0) : 1,
+                  filter: socPopIn ? 'drop-shadow(0 0 16px #00e6c3)' : 'none',
+                  transition: step === 4 ? 'opacity 0.7s, filter 0.7s' : undefined,
+                }}>
+                  <circle cx={60} cy={220} r={32} fill="#23293a" stroke="#00e6c3" strokeWidth={2} />
+                  <text x={60} y={230} textAnchor="middle" fontSize={28} fill="#fff">🧑‍💼</text>
+                  <text x={60} y={268} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>SOC Analyst</text>
+                  <circle cx={60} cy={220} r={38} fill="#00e6c3" opacity={0.25} />
+                </g>
+                {/* Dotted blue line: step 4 (webapp→SOC), step 5 (SOC→webapp) */}
+                {step === 4 && showBlueLine && (
+                  <AnimatedLine x1={300} y1={120} x2={60} y2={220} progress={blueLineProgress} stroke="#00e6c3" strokeWidth={4} dashArray="8 6" opacity={blueLineOpacity} />
+                )}
+                {step === 5 && showBlueLine && (
+                  <AnimatedLine x1={60} y1={220} x2={300} y2={120} progress={blueLineProgress} stroke="#00e6c3" strokeWidth={4} dashArray="8 6" opacity={blueLineOpacity} />
+                )}
                 {/* Red highlight on compromised nodes and attack line from webapp to db */}
-                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                {['webapp','waf','server','cloud','db'].map(key => (
-                  <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
-                ))}
+                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                {/* Only fade node highlights for waf, server, cloud, db in step 5, then remove highlight entirely */}
+                {step === 4 && (
+                  <>
+                    <circle cx={440} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                    <circle cx={580} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                    <circle cx={720} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                    <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                  </>
+                )}
+                {step === 5 && redNodeOpacity > 0.01 && (
+                  <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                )}
+                {/* Webapp highlight does not fade */}
+                <circle cx={300} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
               </g>
             )}
-            {/* Step 5: keep red highlight/attack line, animate blue line from sensor to SOC/analyst */}
+            {/* Step 5: keep red highlight/attack line, SOC/analyst removed */}
             {step === 5 && (
               <g>
-                {/* Brighter webapp sensor highlight */}
-                <circle cx={300} cy={120} r={44} fill="#00fff0" opacity={0.45} style={{ filter: 'blur(2.5px)' }} />
-                {/* SOC/Security Analyst user object (same position) */}
-                <g>
-                  <circle cx={socAnalystX} cy={socAnalystY} r={32} fill="#23293a" stroke="#00e6c3" strokeWidth={2} />
-                  <text x={socAnalystX} y={socAnalystY + 10} textAnchor="middle" fontSize={28} fill="#fff">🧑‍💼</text>
-                  <text x={socAnalystX} y={socAnalystY + 48} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>SOC Analyst</text>
-                </g>
-                {/* Red highlight on compromised nodes and attack line from webapp to db */}
-                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} />
-                {['webapp','waf','server','cloud','db'].map(key => (
-                  <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18} />
+                {/* Red node highlights for waf, server, cloud, db (fade out), and webapp (does not fade) */}
+                {['waf','server','cloud','db'].map(key => (
+                  redNodeOpacity > 0.01 && (
+                    <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                  )
                 ))}
-                {/* Blue line from contrast sensor (above webapp) to SOC/analyst (animated) */}
-                {socLineProgress > 0 && (
-                  <AnimatedLine x1={300} y1={102} x2={socAnalystX} y2={socAnalystY + 32} progress={socLineProgress} stroke="#00e6c3" strokeWidth={4} />
-                )}
+                {/* Webapp highlight does not fade */}
+                <circle cx={300} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
+                {/* Third party highlight (always on in step 5) */}
+                <circle cx={300} cy={220} r={38} fill="#e74c3c" opacity={0.18} />
+              </g>
+            )}
+            {/* Step 6: red lines and highlights fade out after a pause */}
+            {step === 6 && (
+              <g>
+                {/* Red attack lines (fade out) */}
+                <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={redLineOpacity * attackerOpacity} />
+                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={redLineOpacity * attackerOpacity} />
+                {/* WebApp to Third Party */}
+                <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                {/* WebApp to WAF, WAF to Server, Server to Cloud, Cloud to DB */}
+                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                {/* Red node highlights (fade out) */}
+                <circle cx={440} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                <circle cx={580} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                <circle cx={720} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                {/* Attacker node fades out after lines */}
+                <g style={{ opacity: attackerOpacity, transition: 'opacity 0.5s' }}>
+                  <circle cx={60} cy={120} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
+                  <text x={60} y={130} textAnchor="middle" fontSize={28} fill="#fff">🕵️‍♂️</text>
+                  <text x={60} y={168} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>Attacker</text>
+                </g>
               </g>
             )}
             {/* ...existing defs for arrowhead... */}
