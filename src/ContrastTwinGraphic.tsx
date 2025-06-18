@@ -96,7 +96,7 @@ export default function ContrastTwinGraphic() {
 
   // Use the same SOC analyst position for both steps
   const socAnalystX = 600, socAnalystY = 30;
-
+cat ~/.ssh/id_ed25519.pub
   // Animate step string: fade between sentences
   useEffect(() => {
     setStepTextIndex(0);
