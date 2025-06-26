@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './ContrastTwinGraphic.css';
 
 // Node layout for all steps
@@ -104,18 +104,54 @@ export default function ContrastTwinGraphic() {
   const [socPopIn, setSocPopIn] = useState(false);
   // Animation state for webapp glow
   const [webappGlow, setWebappGlow] = useState(false);
-  // Animation state for blue line
+  // Animation state for blue line from SOC to webapp in step 5
   const [showBlueLine, setShowBlueLine] = useState(false);
   const [blueLineProgress, setBlueLineProgress] = useState(0);
   const [blueLineOpacity, setBlueLineOpacity] = useState(1);
-  // Animation state for red line fade in step 5 and 6
-  const [redLineOpacity, setRedLineOpacity] = useState(1);
-  // Animation state for red node highlight fade in step 5 and 6
-  const [redNodeOpacity, setRedNodeOpacity] = useState(1);
-  // Animation state for attacker/node fade in step 6
-  const [attackerOpacity, setAttackerOpacity] = useState(1);
+  // Remove unused individual animation states for step 5 (now grouped in step5Anim)
+  // const [redLineOpacity, setRedLineOpacity] = useState(1);
+  // const [redNodeOpacity, setRedNodeOpacity] = useState(1);
+  // const [attackerOpacity, setAttackerOpacity] = useState(1);
+  // const [attackerScale, setAttackerScale] = useState(1);
+  // const [socScale, setSocScale] = useState(1);
+  // const [socOpacity, setSocOpacity] = useState(1);
+  // const [webappBlueGlowOpacity, setWebappBlueGlowOpacity] = useState(1);
+
+  // Centralized refs for animation frame and timeout IDs
+  const animationRefs = useRef<{ rafs: number[]; timers: number[] }>({ rafs: [], timers: [] });
+
+  // Helper to register and cleanup animation frames and timeouts
+  const registerRaf = (id: number) => {
+    animationRefs.current.rafs.push(id);
+    return id;
+  };
+  const registerTimer = (id: number) => {
+    animationRefs.current.timers.push(id);
+    return id;
+  };
+  const cleanupAnimations = () => {
+    animationRefs.current.rafs.forEach(id => cancelAnimationFrame(id));
+    animationRefs.current.timers.forEach(id => clearTimeout(id));
+    animationRefs.current.rafs = [];
+    animationRefs.current.timers = [];
+  };
+
+  // Grouped animation state for step 5 (as an example)
+  const [step5Anim, setStep5Anim] = useState({
+    redLineOpacity: 1,
+    redNodeOpacity: 1,
+    attackerOpacity: 1,
+    attackerScale: 1,
+    socScale: 1,
+    socOpacity: 1,
+    webappBlueGlowOpacity: 1,
+    showBlueLine: false,
+    blueLineProgress: 0,
+    blueLineOpacity: 1,
+  });
 
   useEffect(() => {
+    cleanupAnimations(); // Always cleanup on step change
     setStepTextIndex(0);
     setShowCVE(false);
     setCveLineProgress(0);
@@ -259,103 +295,103 @@ export default function ContrastTwinGraphic() {
     }
     // Step 5: SOC blocks attack, blue line reverse, fade out red lines/highlights
     if (step === 5) {
-      setSocPopIn(true);
-      setWebappGlow(true);
-      setShowBlueLine(false);
-      setBlueLineProgress(0);
-      setBlueLineOpacity(1);
-      setRedLineOpacity(1);
-      setRedNodeOpacity(1);
-      setAttackerOpacity(1);
-      setTimeout(() => {
-        setShowBlueLine(true);
-        // Animate the blue line progress (reverse direction, slower)
-        let raf: number;
+      setStep5Anim({
+        redLineOpacity: 1,
+        redNodeOpacity: 1,
+        attackerOpacity: 1,
+        attackerScale: 1,
+        socScale: 1,
+        socOpacity: 1,
+        webappBlueGlowOpacity: 1,
+        showBlueLine: false,
+        blueLineProgress: 0,
+        blueLineOpacity: 1,
+      });
+      // Animate blue line from SOC to webapp first
+      registerTimer(setTimeout(() => {
+        setStep5Anim(anim => ({ ...anim, showBlueLine: true }));
         const animate = () => {
-          setBlueLineProgress(p => {
-            if (p < 1) {
-              raf = requestAnimationFrame(animate);
-              return Math.min(1, p + 0.018);
+          setStep5Anim(anim => {
+            if (anim.blueLineProgress < 1) {
+              registerRaf(requestAnimationFrame(animate));
+              return { ...anim, blueLineProgress: Math.min(1, anim.blueLineProgress + 0.018) };
             }
             // After line is fully drawn, start fade out after a 2 second pause
-            setTimeout(() => {
+            registerTimer(setTimeout(() => {
               const fadeBlue = () => {
-                setBlueLineOpacity(op => {
-                  if (op > 0) {
-                    requestAnimationFrame(fadeBlue);
-                    return Math.max(0, op - 0.04);
+                setStep5Anim(anim => {
+                  if (anim.blueLineOpacity > 0) {
+                    registerRaf(requestAnimationFrame(fadeBlue));
+                    return { ...anim, blueLineOpacity: Math.max(0, anim.blueLineOpacity - 0.04) };
                   }
                   // After blue line fades, fade red lines and node highlights
-                  setTimeout(() => {
+                  registerTimer(setTimeout(() => {
                     const fadeRed = () => {
-                      setRedLineOpacity(r => {
-                        if (r > 0) {
-                          requestAnimationFrame(fadeRed);
-                          return Math.max(0, r - 0.04);
+                      setStep5Anim(anim => {
+                        if (anim.redLineOpacity > 0 || anim.redNodeOpacity > 0) {
+                          registerRaf(requestAnimationFrame(fadeRed));
+                          return {
+                            ...anim,
+                            redLineOpacity: Math.max(0, anim.redLineOpacity - 0.04),
+                            redNodeOpacity: Math.max(0, anim.redNodeOpacity - 0.04),
+                          };
                         }
-                        return 0;
-                      });
-                      setRedNodeOpacity(n => {
-                        if (n > 0) {
-                          requestAnimationFrame(fadeRed);
-                          return Math.max(0, n - 0.04);
-                        }
-                        return 0;
+                        return anim;
                       });
                     };
                     fadeRed();
-                  }, 200); // Short pause after blue line fade
-                  return 0;
+                    // After lines/highlights fade, animate attacker and SOC scale
+                    registerTimer(setTimeout(() => {
+                      // Grow attacker and SOC for 0.5s
+                      let growStart = Date.now();
+                      const grow = () => {
+                        const elapsed = (Date.now() - growStart) / 500; // 0 to 1 over 0.5s
+                        if (elapsed < 1) {
+                          setStep5Anim(anim => ({ ...anim, attackerScale: 1 + 0.5 * elapsed, socScale: 1 + 0.5 * elapsed }));
+                          registerRaf(requestAnimationFrame(grow));
+                        } else {
+                          setStep5Anim(anim => ({ ...anim, attackerScale: 1.5, socScale: 1.5 }));
+                          // Shrink attacker and SOC for 1s
+                          let shrinkStart = Date.now();
+                          const shrink = () => {
+                            const elapsedShrink = (Date.now() - shrinkStart) / 1000; // 0 to 1 over 1s
+                            if (elapsedShrink < 1) {
+                              setStep5Anim(anim => ({ ...anim, attackerScale: 1.5 - 1.5 * elapsedShrink, socScale: 1.5 - 1.5 * elapsedShrink }));
+                              registerRaf(requestAnimationFrame(shrink));
+                            } else {
+                              setStep5Anim(anim => ({ ...anim, attackerScale: 0, attackerOpacity: 0, socScale: 0, socOpacity: 0 }));
+                              // Fade out webapp blue glow
+                              const fadeWebappGlow = () => {
+                                setStep5Anim(anim => {
+                                  if (anim.webappBlueGlowOpacity > 0) {
+                                    registerRaf(requestAnimationFrame(fadeWebappGlow));
+                                    return { ...anim, webappBlueGlowOpacity: Math.max(0, anim.webappBlueGlowOpacity - 0.04) };
+                                  }
+                                  return anim;
+                                });
+                              };
+                              fadeWebappGlow();
+                            }
+                          };
+                          shrink();
+                        }
+                      };
+                      grow();
+                    }, 1200)); // Start scale after lines/highlights fade + 1s
+                  }, 200)); // Short pause after blue line fade
+                  return anim;
                 });
               };
               fadeBlue();
-            }, 2000);
-            return 1;
+            }, 2000));
+            return { ...anim, blueLineProgress: 1 };
           });
         };
         animate();
-      }, 800);
+      }, 300)); // Start blue line animation after 0.3s
     }
-    // Step 6: developer fix
-    if (step === 6) {
-      setCompromisedNodes(['webapp', 'waf', 'server', 'cloud', 'db']);
-      setRedLineOpacity(1);
-      setRedNodeOpacity(1);
-      setAttackerOpacity(1);
-      // Fade out red lines and node highlights after a delay
-      setTimeout(() => {
-        const fadeRed = () => {
-          setRedLineOpacity(r => {
-            if (r > 0) {
-              requestAnimationFrame(fadeRed);
-              return Math.max(0, r - 0.04);
-            }
-            return 0;
-          });
-          setRedNodeOpacity(n => {
-            if (n > 0) {
-              requestAnimationFrame(fadeRed);
-              return Math.max(0, n - 0.04);
-            }
-            return 0;
-          });
-        };
-        fadeRed();
-        // After lines and highlights fade, fade attacker and its lines
-        setTimeout(() => {
-          const fadeAttacker = () => {
-            setAttackerOpacity(a => {
-              if (a > 0) {
-                requestAnimationFrame(fadeAttacker);
-                return Math.max(0, a - 0.04);
-              }
-              return 0;
-            });
-          };
-          fadeAttacker();
-        }, 1200); // Start attacker fade after lines/highlights fade
-      }, 2000); // 2 second pause before fading
-    }
+    // ...existing code for other steps...
+    return cleanupAnimations;
   }, [step]);
 
   return (
@@ -383,14 +419,16 @@ export default function ContrastTwinGraphic() {
             <line x1={720} y1={120} x2={860} y2={120} stroke="#888" strokeWidth={3} strokeDasharray="8 6" opacity={0.6} />
             {/* Third party below webapp connection */}
             <line x1={300} y1={120} x2={300} y2={220} stroke="#888" strokeWidth={3} strokeDasharray="8 8" opacity={0.6} />
-            {/* Main node rendering loop */}
+            {/* Main node rendering loop (exclude attacker in step 5 fade-out only after fade) */}
             {infraNodes.map(node => {
+              // Only exclude attacker node in step 5 if it is fully faded out
+              if (node.key === 'attacker' && step === 5 && step5Anim.attackerOpacity === 0) return null;
               const isDb = node.key === 'db';
               return (
                 <g key={node.key}>
                   {/* Only render db highlight in step 3, 4, or 5 while fading */}
-                  {(isDb && ((step === 3 || step === 4) || (step === 5 && redNodeOpacity > 0.01))) && (
-                    <circle cx={node.x} cy={node.y} r={38} fill="#e74c3c" opacity={0.18 * (step === 5 ? redNodeOpacity : 1)} />
+                  {(isDb && ((step === 3 || step === 4) || (step === 5 && step5Anim.redNodeOpacity > 0.01))) && (
+                    <circle cx={node.x} cy={node.y} r={38} fill="#e74c3c" opacity={0.18 * (step === 5 ? step5Anim.redNodeOpacity : 1)} />
                   )}
                   <circle cx={node.x} cy={node.y} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
                   <text x={node.x} y={node.y + 10} textAnchor="middle" fontSize={28} fill="#fff">{node.icon}</text>
@@ -447,19 +485,19 @@ export default function ContrastTwinGraphic() {
                 {/* Dashed red line (growing in step 2, static after) from attacker to CVE */}
                 {(step === 1
                   ? (showCVE && cveLineProgress > 0 && <AnimatedLine x1={60} y1={120} x2={200} y2={60} progress={cveLineProgress} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />)
-                  : (step > 1 && step !== 6 && <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
+                  : (step > 1 && step < 5 && <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
                 )}
                 {/* Dashed red line (growing in step 2, static after) from attacker to webapp without arrow */}
                 {step === 1 && cveLineProgress === 1 && webappLineProgress > 0 && (
                   <AnimatedLine x1={60} y1={120} x2={300} y2={120} progress={webappLineProgress} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />
                 )}
-                {(step > 1 && step < 7) && (
-                  <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step === 6 ? redLineOpacity * attackerOpacity : 1} />
+                {(step > 1 && step < 5) && (
+                  <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />
                 )}
                 {/* Dashed red line (growing in step 2, static after) from webapp to third party */}
                 {(step === 1
                   ? (webappLineProgress === 1 && <AnimatedLine x1={300} y1={120} x2={300} y2={220} progress={1} stroke="#e74c3c" strokeWidth={4} dashArray="8 6" />)
-                  : (step > 1 && step !== 6 && <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
+                  : (step > 1 && step < 5 && <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" />)
                 )}
                 <defs>
                   <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto" markerUnits="strokeWidth">
@@ -673,15 +711,15 @@ export default function ContrastTwinGraphic() {
                 {step === 4 && showBlueLine && (
                   <AnimatedLine x1={300} y1={120} x2={60} y2={220} progress={blueLineProgress} stroke="#00e6c3" strokeWidth={4} dashArray="8 6" opacity={blueLineOpacity} />
                 )}
-                {step === 5 && showBlueLine && (
-                  <AnimatedLine x1={60} y1={220} x2={300} y2={120} progress={blueLineProgress} stroke="#00e6c3" strokeWidth={4} dashArray="8 6" opacity={blueLineOpacity} />
+                {step === 5 && step5Anim.showBlueLine && (
+                  <AnimatedLine x1={60} y1={220} x2={300} y2={120} progress={step5Anim.blueLineProgress} stroke="#00e6c3" strokeWidth={4} dashArray="8 6" opacity={step5Anim.blueLineOpacity} />
                 )}
                 {/* Red highlight on compromised nodes and attack line from webapp to db */}
-                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
-                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
-                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
-                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
-                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? redLineOpacity : 1} />
+                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? step5Anim.redLineOpacity : 1} />
+                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? step5Anim.redLineOpacity : 1} />
+                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? step5Anim.redLineOpacity : 1} />
+                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? step5Anim.redLineOpacity : 1} />
+                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step === 5 ? step5Anim.redLineOpacity : 1} />
                 {/* Only fade node highlights for waf, server, cloud, db in step 5, then remove highlight entirely */}
                 {step === 4 && (
                   <>
@@ -691,8 +729,8 @@ export default function ContrastTwinGraphic() {
                     <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
                   </>
                 )}
-                {step === 5 && redNodeOpacity > 0.01 && (
-                  <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                {step === 5 && step5Anim.redNodeOpacity > 0.01 && (
+                  <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
                 )}
                 {/* Webapp highlight does not fade */}
                 <circle cx={300} cy={120} r={38} fill="#e74c3c" opacity={0.18} />
@@ -703,8 +741,8 @@ export default function ContrastTwinGraphic() {
               <g>
                 {/* Red node highlights for waf, server, cloud, db (fade out), and webapp (does not fade) */}
                 {['waf','server','cloud','db'].map(key => (
-                  redNodeOpacity > 0.01 && (
-                    <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                  step5Anim.redNodeOpacity > 0.01 && (
+                    <circle key={key} cx={infraNodes.find(n=>n.key===key)!.x} cy={infraNodes.find(n=>n.key===key)!.y} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
                   )
                 ))}
                 {/* Webapp highlight does not fade */}
@@ -717,26 +755,67 @@ export default function ContrastTwinGraphic() {
             {step === 6 && (
               <g>
                 {/* Red attack lines (fade out) */}
-                <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={redLineOpacity * attackerOpacity} />
-                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={redLineOpacity * attackerOpacity} />
-                {/* WebApp to Third Party */}
-                <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                {/* Attacker to CVE (dashed) - use redLineOpacity * attackerOpacity for sync fade */}
+                <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity * step5Anim.attackerOpacity} />
+                {/* Attacker to WebApp (dashed) */}
+                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity * step5Anim.attackerOpacity} />
+                {/* WebApp to Third Party (dashed) */}
+                <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity} />
                 {/* WebApp to WAF, WAF to Server, Server to Cloud, Cloud to DB */}
-                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
-                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
-                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
-                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={redLineOpacity} />
+                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
                 {/* Red node highlights (fade out) */}
-                <circle cx={440} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
-                <circle cx={580} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
-                <circle cx={720} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
-                <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * redNodeOpacity} />
+                <circle cx={440} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={580} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={720} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
                 {/* Attacker node fades out after lines */}
-                <g style={{ opacity: attackerOpacity, transition: 'opacity 0.5s' }}>
+                <g style={{ opacity: step5Anim.attackerOpacity, transition: 'opacity 0.5s' }}>
                   <circle cx={60} cy={120} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
                   <text x={60} y={130} textAnchor="middle" fontSize={28} fill="#fff">🕵️‍♂️</text>
                   <text x={60} y={168} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>Attacker</text>
                 </g>
+              </g>
+            )}
+            {/* Step 5: attacker, SOC, and attack lines fade/scale out after a pause (rendered last for top stacking) */}
+            {step === 5 && (
+              <g style={{ pointerEvents: 'none' }}>
+                {/* Red attack lines (fade out) */}
+                {/* Attacker to CVE (dashed) - use redLineOpacity * attackerOpacity for sync fade */}
+                <line x1={60} y1={120} x2={200} y2={60} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity * step5Anim.attackerOpacity} />
+                {/* Attacker to WebApp (dashed) */}
+                <line x1={60} y1={120} x2={300} y2={120} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity * step5Anim.attackerOpacity} />
+                {/* WebApp to Third Party (dashed) */}
+                <line x1={300} y1={120} x2={300} y2={220} stroke="#e74c3c" strokeWidth={4} strokeDasharray="8 6" opacity={step5Anim.redLineOpacity} />
+                {/* WebApp to WAF, WAF to Server, Server to Cloud, Cloud to DB */}
+                <line x1={300} y1={120} x2={440} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={440} y1={120} x2={580} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={580} y1={120} x2={720} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                <line x1={720} y1={120} x2={860} y2={120} stroke="#e74c3c" strokeWidth={4} opacity={step5Anim.redLineOpacity} />
+                {/* Red node highlights (fade out) */}
+                <circle cx={440} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={580} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={720} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                <circle cx={860} cy={120} r={38} fill="#e74c3c" opacity={0.18 * step5Anim.redNodeOpacity} />
+                {/* Attacker node fades and scales out after lines */}
+                {step5Anim.attackerOpacity > 0 && (
+                  <g style={{ opacity: step5Anim.attackerOpacity, transition: 'opacity 0.5s', transform: `scale(${step5Anim.attackerScale})`, transformOrigin: '60px 120px' }}>
+                    <circle cx={60} cy={120} r={32} fill={'#23293a'} stroke={'#888'} strokeWidth={2} />
+                    <text x={60} y={130} textAnchor="middle" fontSize={28} fill="#fff">🕵️‍♂️</text>
+                    <text x={60} y={168} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>Attacker</text>
+                  </g>
+                )}
+                {/* SOC Analyst node fades and scales out after lines */}
+                {step5Anim.socOpacity > 0 && (
+                  <g style={{ opacity: step5Anim.socOpacity, transition: 'opacity 0.5s', transform: `scale(${step5Anim.socScale})`, transformOrigin: '60px 220px' }}>
+                    <circle cx={60} cy={220} r={32} fill="#23293a" stroke="#00e6c3" strokeWidth={2} />
+                    <text x={60} y={230} textAnchor="middle" fontSize={28} fill="#fff">🧑‍💼</text>
+                    <text x={60} y={268} textAnchor="middle" fontSize={13} fill="#00e6c3" fontWeight={500}>SOC Analyst</text>
+                    <circle cx={60} cy={220} r={38} fill="#00e6c3" opacity={0.25} />
+                  </g>
+                )}
               </g>
             )}
             {/* ...existing defs for arrowhead... */}
